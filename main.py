@@ -5,13 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import torch
 import cv2
 import numpy as np
-from pathlib import Path
+import os
 
 from model import CNN_Transformer
 from utils import preprocess, decode
 from cv_module import detect_plate_region
 
-app = FastAPI(title="ANPR - License Plate Recognition", description="Automatic Number Plate Recognition System")
+app = FastAPI(
+    title="ANPR - License Plate Recognition",
+    description="Automatic Number Plate Recognition System"
+)
 
 # Enable CORS
 app.add_middleware(
@@ -22,11 +25,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Load model
-model = CNN_Transformer(37)
-model.load_state_dict(torch.load("plate_model.pth", map_location="cpu"))
-model.eval()
+# =========================
+# MODEL LOADING (SAFE)
+# =========================
 
+model = CNN_Transformer(37)
+
+MODEL_PATH = "plate_model.pth"
+
+if os.path.exists(MODEL_PATH):
+    print("Model found, loading...")
+    model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+    model.eval()
+else:
+    print("Model not found, skipping loading...")
+    model = None
+
+
+# =========================
+# ROUTES
+# =========================
 
 @app.get("/")
 async def get_home():
@@ -36,6 +54,10 @@ async def get_home():
 @app.post("/predict")
 async def predict(file: UploadFile):
 
+    # 🔴 IMPORTANT: handle missing model
+    if model is None:
+        return {"plate": "Model not loaded (file missing)"}
+
     contents = await file.read()
 
     npimg = np.frombuffer(contents, np.uint8)
@@ -44,7 +66,7 @@ async def predict(file: UploadFile):
     if img is None:
         return {"plate": "ERROR: Invalid image"}
 
-    # ✅ segmentation
+    # Plate detection
     plate = detect_plate_region(img)
 
     if plate is not None:

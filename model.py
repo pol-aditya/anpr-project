@@ -15,13 +15,11 @@ class CNN_Transformer(nn.Module):
         )
 
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=128*8,
-            nhead=8
+            d_model=128*8, nhead=8
         )
 
         self.transformer = nn.TransformerEncoder(
-            encoder_layer,
-            num_layers=2
+            encoder_layer, num_layers=2
         )
 
         self.fc = nn.Linear(128*8, num_classes)
